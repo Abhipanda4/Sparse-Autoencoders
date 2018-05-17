@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
@@ -16,6 +17,7 @@ RHO = 0.05
 N_INP = 784
 N_HIDDEN = 1000
 N_EPOCHS = 5
+LOG_STEPS = 100
 
 rho = torch.FloatTensor([RHO for _ in range(N_INP)]).unsqueeze(0)
 
@@ -24,7 +26,7 @@ root = './data'
 if not os.path.exists(root):
     os.mkdir(root)
 
-trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+trans = transforms.Compose([transforms.ToTensor()])
 train_set = datasets.MNIST(root=root, train=True, transform=trans, download=True)
 test_set = datasets.MNIST(root=root, train=False, transform=trans, download=True)
 
@@ -42,17 +44,21 @@ auto_encoder = SparseAutoencoder(N_INP, N_HIDDEN)
 optimizer = optim.Adam(auto_encoder.parameters(), lr=1e-3)
 
 for epoch in range(N_EPOCHS):
+    # log info
+    print("Starting epoch: [%3d]" %(epoch + 1))
+
     for b_index, (x, _) in enumerate(train_loader):
-        x = x.view(x.size()[0], -1)
+        x = x.view(x.size()[0], -1)/255.0
         x = Variable(x)
-        target = x
         encoded, decoded = auto_encoder(x)
         rho_hat = torch.sum(decoded, dim=0, keepdim=True)
-        MSE_loss = (target - decoded) ** 2
+        MSE_loss = (x - rho_hat) ** 2
+        MSE_loss = MSE_loss.view(1, -1).sum(1)
         sparsity_penalty = BETA * F.kl_div(rho_hat, rho)
-        print(MSE_loss.size())
-        print(sparsity_penalty.size())
         loss = MSE_loss + sparsity_penalty
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        if b_index % LOG_STEPS == 0:
+            print("\tLoss: %.4f" %(loss.data))
+
