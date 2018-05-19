@@ -10,6 +10,6 @@ class SparseAutoencoder(nn.Module):
         self.decoder = nn.Linear(n_hidden, n_inp)
 
     def forward(self, x):
-        encoded = F.relu(self.encoder(x))
+        encoded = F.sigmoid(self.encoder(x))
         decoded = F.sigmoid(self.decoder(encoded))
         return encoded, decoded
